@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import { ethers } from "ethers";
+import WalletConnectProvider from "@walletconnect/web3-provider";
 import ErrorMessage from "./ErrorMessage";
 import TxList from "./TxList";
 
@@ -16,6 +17,27 @@ const connectWallet = async ({ setWalletAddress, setError }) => {
     const walletAddress = await signer.getAddress();
     setWalletAddress(walletAddress);
     console.log("Wallet Address:", walletAddress);
+  } catch (err) {
+    setError(err.message);
+    console.log(err.message);
+  }
+};
+
+const connectWalletWithWalletConnect = async ({
+  setWalletAddress,
+  setError,
+}) => {
+  try {
+    const provider = new WalletConnectProvider({
+      infuraId: "YOUR_INFURA_ID", // Замените на ваш Infura ID
+    });
+
+    await provider.enable();
+    const web3Provider = new ethers.BrowserProvider(provider);
+    const signer = await web3Provider.getSigner();
+    const walletAddress = await signer.getAddress();
+    setWalletAddress(walletAddress);
+    console.log("Wallet Address (WalletConnect):", walletAddress);
   } catch (err) {
     setError(err.message);
     console.log(err.message);
@@ -58,9 +80,13 @@ export default function App() {
     await connectWallet({ setWalletAddress, setError });
   };
 
+  const handleConnectWalletWithWalletConnect = async () => {
+    setError();
+    await connectWalletWithWalletConnect({ setWalletAddress, setError });
+  };
+
   const handleSendTransaction = async (e) => {
     e.preventDefault();
-
     setError();
 
     await startPayment({
@@ -86,7 +112,14 @@ export default function App() {
                   className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none mb-4"
                   onClick={handleConnectWallet}
                 >
-                  Connect Wallet
+                  Connect Wallet (MetaMask)
+                </button>
+                <button
+                  type="button"
+                  className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none mb-4"
+                  onClick={handleConnectWalletWithWalletConnect}
+                >
+                  Connect Wallet (WalletConnect)
                 </button>
                 {walletAddress && (
                   <div className="my-3 text-white">
