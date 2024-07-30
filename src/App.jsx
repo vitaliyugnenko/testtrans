@@ -1,17 +1,18 @@
-import { useState, useEffect } from "react";
 import {
   WalletConnectModalSign,
   useConnect,
   useRequest,
 } from "@walletconnect/modal-sign-react";
+import { useState, useEffect } from "react";
 
 // 1. Get projectID at https://cloud.walletconnect.com
 const projectId = "90f079dc357f3b0a2500be0388582698";
 
 export default function HomePage() {
   const [session, setSession] = useState(null);
-  const [walletAddress, setWalletAddress] = useState("");
-  const { request, error, loading } = useRequest();
+  const [walletAddress, setWalletAddress] = useState(null);
+  const { request } = useRequest();
+  const [disabled, setDisabled] = useState(false);
   const { connect, disconnect } = useConnect({
     requiredNamespaces: {
       eip155: {
@@ -22,31 +23,56 @@ export default function HomePage() {
     },
   });
 
+  // Load session and wallet address from localStorage on component mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem("session");
+    const savedAddress = localStorage.getItem("walletAddress");
+    if (savedSession) {
+      setSession(JSON.parse(savedSession));
+    }
+    if (savedAddress) {
+      setWalletAddress(savedAddress);
+    }
+  }, []);
+
   async function onConnect() {
     try {
-      const session = await connect();
-      setSession(session);
-
-      // Assuming session contains the address
-      const address = session?.peerMeta?.name || "Unknown address";
-      setWalletAddress(address);
+      setDisabled(true);
+      const newSession = await connect();
+      setSession(newSession);
+      const accounts = newSession?.namespaces?.eip155?.accounts;
+      if (accounts && accounts.length > 0) {
+        const address = accounts[0].split(":")[2]; // Extract the address from the account string
+        setWalletAddress(address);
+        // Save session and wallet address to localStorage
+        localStorage.setItem("session", JSON.stringify(newSession));
+        localStorage.setItem("walletAddress", address);
+      }
     } catch (err) {
       console.error(err);
+    } finally {
+      setDisabled(false);
     }
   }
 
   async function onDisconnect() {
     try {
+      setDisabled(true);
       await disconnect();
       setSession(null);
-      setWalletAddress("");
+      setWalletAddress(null);
+      // Remove session and wallet address from localStorage
+      localStorage.removeItem("session");
+      localStorage.removeItem("walletAddress");
     } catch (err) {
       console.error(err);
+    } finally {
+      setDisabled(false);
     }
   }
 
   async function onSendTransaction() {
-    if (!session) {
+    if (!session || !walletAddress) {
       alert("Please connect a wallet first.");
       return;
     }
@@ -74,38 +100,20 @@ export default function HomePage() {
     }
   }
 
-  useEffect(() => {
-    // Restore session and wallet address from local storage on mount
-    const savedSession = JSON.parse(
-      localStorage.getItem("walletconnect-session")
-    );
-    if (savedSession) {
-      setSession(savedSession);
-      const address = savedSession.peerMeta?.name || "Unknown address";
-      setWalletAddress(address);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Save session to local storage whenever it changes
-    if (session) {
-      localStorage.setItem("walletconnect-session", JSON.stringify(session));
-    }
-  }, [session]);
-
   return (
-    <>
-      <button onClick={onConnect} disabled={loading}>
+    <div style={{ textAlign: "center", color: "#fff" }}>
+      <button onClick={onConnect} disabled={disabled}>
         Connect Wallet
       </button>
-      <button onClick={onDisconnect} disabled={loading || !session}>
-        Disconnect Wallet
-      </button>
+      {session && (
+        <button onClick={onDisconnect} disabled={disabled}>
+          Disconnect Wallet
+        </button>
+      )}
       {walletAddress && <div>Connected Wallet Address: {walletAddress}</div>}
-      <button onClick={onSendTransaction} disabled={!session}>
+      <button onClick={onSendTransaction} disabled={!session || !walletAddress}>
         Send Transaction
       </button>
-
       {/* Set up WalletConnectModalSign component */}
       <WalletConnectModalSign
         projectId={projectId}
@@ -116,6 +124,6 @@ export default function HomePage() {
           icons: ["https://my-dapp.com/logo.png"],
         }}
       />
-    </>
+    </div>
   );
 }
