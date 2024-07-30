@@ -23,15 +23,30 @@ export default function HomePage() {
     },
   });
 
+  // Load session and wallet address from localStorage on component mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem("session");
+    const savedAddress = localStorage.getItem("walletAddress");
+    if (savedSession) {
+      setSession(JSON.parse(savedSession));
+    }
+    if (savedAddress) {
+      setWalletAddress(savedAddress);
+    }
+  }, []);
+
   async function onConnect() {
     try {
       setDisabled(true);
-      const session = await connect();
-      setSession(session);
-      // Get wallet address from session
-      const accounts = session?.namespaces?.eip155?.accounts;
+      const newSession = await connect();
+      setSession(newSession);
+      const accounts = newSession?.namespaces?.eip155?.accounts;
       if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0].split(":")[2]); // Extract the address from the account string
+        const address = accounts[0].split(":")[2]; // Extract the address from the account string
+        setWalletAddress(address);
+        // Save session and wallet address to localStorage
+        localStorage.setItem("session", JSON.stringify(newSession));
+        localStorage.setItem("walletAddress", address);
       }
     } catch (err) {
       console.error(err);
@@ -46,6 +61,9 @@ export default function HomePage() {
       await disconnect();
       setSession(null);
       setWalletAddress(null);
+      // Remove session and wallet address from localStorage
+      localStorage.removeItem("session");
+      localStorage.removeItem("walletAddress");
     } catch (err) {
       console.error(err);
     } finally {
