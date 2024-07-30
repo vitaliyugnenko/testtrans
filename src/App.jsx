@@ -3,16 +3,13 @@ import {
   useConnect,
   useRequest,
 } from "@walletconnect/modal-sign-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-// 1. Get projectID at https://cloud.walletconnect.com
 const projectId = "90f079dc357f3b0a2500be0388582698";
-// if (!projectId) {
-// throw new Error('You need to provide NEXT_PUBLIC_PROJECT_ID env variable')
-// }
 
 export default function HomePage() {
-  const [session, setSession] = useState({});
+  const [session, setSession] = useState(null);
+  const [walletAddress, setWalletAddress] = useState("");
   const { request, data, error, loading } = useRequest();
   const [disabled, setDisabled] = useState(false);
   const { connect } = useConnect({
@@ -29,8 +26,14 @@ export default function HomePage() {
     try {
       setDisabled(true);
       const session = await connect();
-      console.info(session);
       setSession(session);
+
+      // Get the connected wallet address from the session
+      const accounts = session?.accounts || [];
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        localStorage.setItem("walletAddress", accounts[0]); // Save to localStorage
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -38,11 +41,19 @@ export default function HomePage() {
     }
   }
 
+  useEffect(() => {
+    const storedAddress = localStorage.getItem("walletAddress");
+    if (storedAddress) {
+      setWalletAddress(storedAddress);
+    }
+  }, []);
+
   return (
     <>
       <button onClick={onConnect} disabled={disabled}>
         Connect Wallet
       </button>
+      {walletAddress && <div>Connected Wallet Address: {walletAddress}</div>}
       <button
         onClick={async () => {
           const response = await request({
@@ -71,10 +82,9 @@ export default function HomePage() {
         }}
         disabled={disabled}
       >
-        send Transaction
+        Send Transaction
       </button>
 
-      {/* Set up WalletConnectModalSign component */}
       <WalletConnectModalSign
         projectId={projectId}
         metadata={{
