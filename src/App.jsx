@@ -1,164 +1,32 @@
 import { useState } from "react";
-import "./App.css";
-import { ethers } from "ethers";
 import WalletConnectProvider from "@walletconnect/web3-provider";
-import ErrorMessage from "./ErrorMessage";
-import TxList from "./TxList";
-
-const connectWallet = async ({ setWalletAddress, setError }) => {
-  try {
-    if (!window.ethereum)
-      throw new Error("No crypto wallet found. Please install it.");
-
-    await window.ethereum.send("eth_requestAccounts");
-    const provider = new ethers.BrowserProvider(window.ethereum);
-
-    const signer = await provider.getSigner();
-    const walletAddress = await signer.getAddress();
-    setWalletAddress(walletAddress);
-    console.log("Wallet Address:", walletAddress);
-  } catch (err) {
-    setError(err.message);
-    console.log(err.message);
-  }
-};
-
-const connectWalletWithWalletConnect = async ({
-  setWalletAddress,
-  setError,
-}) => {
-  try {
-    const provider = new WalletConnectProvider({
-      infuraId: "YOUR_INFURA_ID", // Замените на ваш Infura ID
-    });
-
-    await provider.enable();
-    const web3Provider = new ethers.BrowserProvider(provider);
-    const signer = await web3Provider.getSigner();
-    const walletAddress = await signer.getAddress();
-    setWalletAddress(walletAddress);
-    console.log("Wallet Address (WalletConnect):", walletAddress);
-  } catch (err) {
-    setError(err.message);
-    console.log(err.message);
-  }
-};
-
-const startPayment = async ({ setError, setTxs, ether, addr }) => {
-  try {
-    if (!window.ethereum)
-      throw new Error("No crypto wallet found. Please install it.");
-
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-
-    ethers.getAddress(addr);
-
-    const tx = await signer.sendTransaction({
-      to: addr,
-      value: ethers.parseEther(ether),
-    });
-    console.log({ ether, addr });
-    console.log("tx", tx);
-    setTxs([tx]);
-  } catch (err) {
-    setError(err.message);
-    console.log(err.message);
-  }
-};
+import { ethers } from "ethers";
 
 export default function App() {
-  const [error, setError] = useState();
-  const [txs, setTxs] = useState([]);
   const [walletAddress, setWalletAddress] = useState("");
 
-  const [address, setAddress] = useState();
-  const [amount, setAmount] = useState();
+  const connectWallet = async () => {
+    try {
+      const provider = new WalletConnectProvider({
+        rpc: {
+          1: "https://mainnet.infura.io/v3/824ecb7df0eb4a1bb4ee81c8f3df31eb", // Можно оставить пустым или заменить на другой RPC URL
+        },
+      });
 
-  const handleConnectWallet = async () => {
-    setError();
-    await connectWallet({ setWalletAddress, setError });
-  };
-
-  const handleConnectWalletWithWalletConnect = async () => {
-    setError();
-    await connectWalletWithWalletConnect({ setWalletAddress, setError });
-  };
-
-  const handleSendTransaction = async (e) => {
-    e.preventDefault();
-    setError();
-
-    await startPayment({
-      setError,
-      setTxs,
-      ether: amount,
-      addr: address,
-    });
+      await provider.enable();
+      const web3Provider = new ethers.providers.Web3Provider(provider);
+      const signer = web3Provider.getSigner();
+      const address = await signer.getAddress();
+      setWalletAddress(address);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
-    <div className="flex justify-center items-center h-screen bg-bg-color-main">
-      <div className="flex justify-center items-center h-screen w-1/2">
-        <form className="w-80 p-4" onSubmit={handleSendTransaction}>
-          <div className="w-full mx-auto rounded-xl bg-bg-color-main">
-            <main className="p-4 max-w-screen-lg mx-auto">
-              <h1 className="text-xl font-semibold text-white text-center">
-                Send ETH payment
-              </h1>
-              <div className="my-3 text-center">
-                <button
-                  type="button"
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none mb-4"
-                  onClick={handleConnectWallet}
-                >
-                  Connect Wallet (MetaMask)
-                </button>
-                <button
-                  type="button"
-                  className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none mb-4"
-                  onClick={handleConnectWalletWithWalletConnect}
-                >
-                  Connect Wallet (WalletConnect)
-                </button>
-                {walletAddress && (
-                  <div className="my-3 text-white">
-                    Connected Wallet Address: {walletAddress}
-                  </div>
-                )}
-              </div>
-              <div className="my-3">
-                <input
-                  type="text"
-                  name="addr"
-                  className="form-input w-full focus:ring focus:outline-none border-gray-300 rounded-md text-white pl-4"
-                  placeholder="Recipient Address"
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </div>
-              <div className="my-3">
-                <input
-                  name="ether"
-                  type="text"
-                  className="form-input w-full focus:ring focus:outline-none border-gray-300 rounded-md text-white pl-4"
-                  placeholder="Amount in ETH"
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-            </main>
-            <footer className="p-4 flex justify-center">
-              <button
-                type="submit"
-                className="bg-zinc-800 hover:bg-zinc-900 text-white font-bold py-2 px-4 rounded focus:outline-none"
-              >
-                Pay now
-              </button>
-              <ErrorMessage message={error} />
-              <TxList txs={txs} />
-            </footer>
-          </div>
-        </form>
-      </div>
+    <div className="App">
+      <button onClick={connectWallet}>Connect Wallet</button>
+      {walletAddress && <p>Connected Wallet Address: {walletAddress}</p>}
     </div>
   );
 }
