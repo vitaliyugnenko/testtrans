@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import {
   WalletConnectModalSign,
   useConnect,
+  useRequest,
+  useDisconnect,
 } from "@walletconnect/modal-sign-react";
 
-// Project ID from WalletConnect
 const projectId = "90f079dc357f3b0a2500be0388582698";
 
 export default function HomePage() {
+  const [session, setSession] = useState(null);
   const [walletAddress, setWalletAddress] = useState("");
-  const [disabled, setDisabled] = useState(false);
-  const { connect } = useConnect({
+  const { connect, connected } = useConnect({
     requiredNamespaces: {
       eip155: {
         methods: ["eth_sendTransaction", "personal_sign"],
@@ -20,43 +21,57 @@ export default function HomePage() {
     },
   });
 
+  const { request } = useRequest();
+  const { disconnect } = useDisconnect();
+
   useEffect(() => {
-    // Load wallet address from localStorage on component mount
-    const savedAddress = localStorage.getItem("walletAddress");
-    if (savedAddress) {
-      setWalletAddress(savedAddress);
+    // Check if WalletConnect session exists
+    const storedSession = JSON.parse(
+      localStorage.getItem("walletConnectSession")
+    );
+    if (storedSession) {
+      setSession(storedSession);
+      // Fetch wallet address from session
+      const { accounts } = storedSession;
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+      }
     }
   }, []);
 
-  async function onConnect() {
+  const onConnect = async () => {
     try {
-      setDisabled(true);
-      const session = await connect();
-      console.info(session);
-
-      // Assuming session contains account info
-      const address = session.accounts[0];
-      setWalletAddress(address);
-      localStorage.setItem("walletAddress", address);
+      const newSession = await connect();
+      setSession(newSession);
+      // Save session to localStorage
+      localStorage.setItem("walletConnectSession", JSON.stringify(newSession));
+      const { accounts } = newSession;
+      if (accounts && accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+      }
     } catch (err) {
       console.error(err);
-    } finally {
-      setDisabled(false);
     }
-  }
+  };
+
+  const onDisconnect = () => {
+    try {
+      disconnect();
+      localStorage.removeItem("walletConnectSession");
+      setSession(null);
+      setWalletAddress("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <>
-      <button onClick={onConnect} disabled={disabled}>
+      <button onClick={onConnect} disabled={!!session}>
         Connect Wallet
       </button>
-      {walletAddress && (
-        <div>
-          <p>Connected Wallet Address:</p>
-          <p>{walletAddress}</p>
-        </div>
-      )}
-      {/* Set up WalletConnectModalSign component */}
+      {session && <button onClick={onDisconnect}>Disconnect Wallet</button>}
+      {walletAddress && <div>Connected Wallet Address: {walletAddress}</div>}
       <WalletConnectModalSign
         projectId={projectId}
         metadata={{
