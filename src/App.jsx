@@ -10,10 +10,10 @@ const projectId = "90f079dc357f3b0a2500be0388582698";
 
 export default function HomePage() {
   const [session, setSession] = useState(null);
-  const [walletAddress, setWalletAddress] = useState("");
+  const [walletAddress, setWalletAddress] = useState(null);
   const { request } = useRequest();
   const [disabled, setDisabled] = useState(false);
-  const { connect } = useConnect({
+  const { connect, disconnect } = useConnect({
     requiredNamespaces: {
       eip155: {
         methods: ["eth_sendTransaction", "personal_sign"],
@@ -27,12 +27,11 @@ export default function HomePage() {
     try {
       setDisabled(true);
       const session = await connect();
-      console.info(session);
       setSession(session);
-      // Fetch the wallet address from the session
-      const accounts = session.accounts;
+      // Get wallet address from session
+      const accounts = session?.namespaces?.eip155?.accounts;
       if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0]);
+        setWalletAddress(accounts[0].split(":")[2]); // Extract the address from the account string
       }
     } catch (err) {
       console.error(err);
@@ -41,56 +40,30 @@ export default function HomePage() {
     }
   }
 
-  useEffect(() => {
-    if (session) {
-      const accounts = session.accounts;
-      if (accounts && accounts.length > 0) {
-        setWalletAddress(accounts[0]);
-      }
+  async function onDisconnect() {
+    try {
+      setDisabled(true);
+      await disconnect();
+      setSession(null);
+      setWalletAddress(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDisabled(false);
     }
-  }, [session]);
+  }
 
   return (
-    <div style={{ padding: "20px", backgroundColor: "#000", color: "#fff" }}>
+    <div style={{ textAlign: "center", color: "#fff" }}>
       <button onClick={onConnect} disabled={disabled}>
         Connect Wallet
       </button>
-      {walletAddress && (
-        <div style={{ marginTop: "20px", fontSize: "18px" }}>
-          Connected Wallet Address: {walletAddress}
-        </div>
+      {session && (
+        <button onClick={onDisconnect} disabled={disabled}>
+          Disconnect Wallet
+        </button>
       )}
-      <button
-        onClick={async () => {
-          const response = await request({
-            topic: session?.topic,
-            chainId: "eip155:1",
-            request: {
-              id: 1,
-              jsonrpc: "2.0",
-              method: "personal_sign",
-              params: [
-                {
-                  from: "0x1456225dE90927193F7A171E64a600416f96f2C8",
-                  to: "0x1456225dE90927193F7A171E64a600416f96f2C8",
-                  data: "0x",
-                  nonce: "0x00",
-                  gasPrice: "0xbb5e",
-                  gas: "0x5208",
-                  value: "0x00",
-                  amount: "23",
-                  symbol: "Usdt",
-                },
-              ],
-            },
-          });
-          console.log(response);
-        }}
-        disabled={disabled}
-      >
-        Send Transaction
-      </button>
-
+      {walletAddress && <div>Connected Wallet Address: {walletAddress}</div>}
       {/* Set up WalletConnectModalSign component */}
       <WalletConnectModalSign
         projectId={projectId}
