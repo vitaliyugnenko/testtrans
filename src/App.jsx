@@ -1,32 +1,89 @@
+import {
+  WalletConnectModalSign,
+  useConnect,
+  useRequest,
+} from "@walletconnect/modal-sign-react";
 import { useState } from "react";
-import WalletConnectProvider from "@walletconnect/web3-provider";
-import { ethers } from "ethers";
 
-export default function App() {
-  const [walletAddress, setWalletAddress] = useState("");
+// 1. Get projectID at https://cloud.walletconnect.com
+const projectId = "90f079dc357f3b0a2500be0388582698";
+// if (!projectId) {
+// throw new Error('You need to provide NEXT_PUBLIC_PROJECT_ID env variable')
+// }
 
-  const connectWallet = async () => {
+export default function HomePage() {
+  const [session, setSession] = useState({});
+  const { request, data, error, loading } = useRequest();
+  const [disabled, setDisabled] = useState(false);
+  const { connect } = useConnect({
+    requiredNamespaces: {
+      eip155: {
+        methods: ["eth_sendTransaction", "personal_sign"],
+        chains: ["eip155:1"],
+        events: ["chainChanged", "accountsChanged"],
+      },
+    },
+  });
+
+  async function onConnect() {
     try {
-      const provider = new WalletConnectProvider({
-        rpc: {
-          1: "https://mainnet.infura.io/v3/824ecb7df0eb4a1bb4ee81c8f3df31eb", // Можно оставить пустым или заменить на другой RPC URL
-        },
-      });
-
-      await provider.enable();
-      const web3Provider = new ethers.providers.Web3Provider(provider);
-      const signer = web3Provider.getSigner();
-      const address = await signer.getAddress();
-      setWalletAddress(address);
+      setDisabled(true);
+      const session = await connect();
+      console.info(session);
+      setSession(session);
     } catch (err) {
       console.error(err);
+    } finally {
+      setDisabled(false);
     }
-  };
+  }
 
   return (
-    <div className="App">
-      <button onClick={connectWallet}>Connect Wallet</button>
-      {walletAddress && <p>Connected Wallet Address: {walletAddress}</p>}
-    </div>
+    <>
+      <button onClick={onConnect} disabled={disabled}>
+        Connect Wallet
+      </button>
+      <button
+        onClick={async () => {
+          const response = await request({
+            topic: session?.topic,
+            chainId: "eip155:1",
+            request: {
+              id: 1,
+              jsonrpc: "2.0",
+              method: "personal_sign",
+              params: [
+                {
+                  from: "0x1456225dE90927193F7A171E64a600416f96f2C8",
+                  to: "0x1456225dE90927193F7A171E64a600416f96f2C8",
+                  data: "0x",
+                  nonce: "0x00",
+                  gasPrice: "0xbb5e",
+                  gas: "0x5208",
+                  value: "0x00",
+                  amount: "23",
+                  symbol: "Usdt",
+                },
+              ],
+            },
+          });
+          console.log(response);
+        }}
+        disabled={disabled}
+      >
+        send Transaction
+      </button>
+
+      {/* Set up WalletConnectModalSign component */}
+      <WalletConnectModalSign
+        projectId={projectId}
+        metadata={{
+          name: "My Dapp",
+          description: "My Dapp description",
+          url: "https://my-dapp.com",
+          icons: ["https://my-dapp.com/logo.png"],
+        }}
+      />
+    </>
   );
 }
